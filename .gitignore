@@ -1,0 +1,37 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build output
+dist
+dist-ssr
+*.local
+
+# Env / Secrets — NIEMALS committen
+.env
+.env.*
+!.env.example
+
+# Claude Code lokale Einstellungen
+.claude/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Supabase lokal
+supabase/.branches
+supabase/.temp
+
+# Pipeline-Artefakte (lokale Trockenläufe der Referenz-Python)
+audit.jsonl
+manual_review.csv
+asx_scrape_cache.json
