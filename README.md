@@ -224,7 +224,12 @@ also vorsichtig prompten und immer erst im Trockenlauf prüfen.
 
 ## 12. Fachliche Regeln (Kurzfassung)
 
-Verbindliche Quelle: die mitgelieferten **Guidelines** (Stand 2026-06-17). Kernpunkte:
+Verbindliche Quellen: die mitgelieferten **Guidelines** (Stand 2026-06-17) und die
+**Feld-Landkarte** [`docs/FELDKATALOG.md`](docs/FELDKATALOG.md) (echte Keys/Typen aus
+workxperts.de, Stand 2026-06-18). Kernpunkte:
+- **Schmaler Engine-Scope:** Die Engine schreibt NUR ihre eigenen ENRICH/Präsentations-/SEO-Felder
+  (per Allow-List `enforceScope` erzwungen) und fasst Compliance (`simplecomply.*`/GPSR),
+  Kanal-/Feed-Felder (Google/Zalando/Otto), Shopify-Taxonomie und Stammdaten **niemals** an.
 - **Nur GOLD schreiben** (HTTP 200 + EAN-Identität bewiesen). Keine Halluzination.
 - **Spec-Felder nur in Leerfelder.** Ausnahme **Schutzklasse**: asx gewinnt automatisch.
 - **Präsentationsfelder** (Body, `custom.bulletpoints_rich`, `custom.kurz_usp`, native SEO)

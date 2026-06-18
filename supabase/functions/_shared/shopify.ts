@@ -52,11 +52,14 @@ query($id:ID!){
     innenfutter:  metafield(namespace:"global",key:"Innenfutter"){ value }
     laufsohle:    metafield(namespace:"global",key:"Laufsohle"){ value }
     farbe:        metafield(namespace:"global",key:"Farbe"){ value }
+    geschlecht:   metafield(namespace:"global",key:"Geschlecht"){ value }
     normen:       metafield(namespace:"custom",key:"normen"){ value }
+    dinnorm:      metafield(namespace:"custom",key:"din_norm"){ value }
     schutzkappe:  metafield(namespace:"custom",key:"schutzkappe"){ value }
     durchtritt:   metafield(namespace:"custom",key:"durchtrittschutz"){ value }
     rutsch:       metafield(namespace:"custom",key:"rutschhemmung"){ value }
     weite:        metafield(namespace:"custom",key:"weite"){ value }
+    warnschutz:   metafield(namespace:"custom",key:"warnschutz"){ value }
   }
 }`;
 

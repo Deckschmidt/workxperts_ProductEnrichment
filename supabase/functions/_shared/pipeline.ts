@@ -9,10 +9,41 @@ import { fcMap, fcScrape, type CreditTracker } from "./firecrawl.ts";
 import { productBarcodes, writeProduct } from "./shopify.ts";
 import { audit, reviewRow } from "./db.ts";
 import {
-  canonCap, canonClass, canonColor, canonNorms, canonRutsch, canonWeiteFromTitle,
-  deriveDurchtritt, deriveSearchTerms,
+  canonCap, canonClass, canonColor, canonGeschlecht, canonNorms, canonRutsch, canonWeiteFromTitle,
+  deriveDurchtritt, deriveSearchTerms, deriveWarnschutz, dinNormText,
 } from "./canon.ts";
 import { buildBody, buildBullets, buildSeo, buildUsp, richBullets } from "./templates.ts";
+
+// ============================================================================
+// SCOPE-GUARD (Abschnitt 17 des Prompts + Feldkatalog 05_*.xlsx)
+// Die Engine darf AUSSCHLIESSLICH diese Keys schreiben. Alles andere
+// (simplecomply.* GPSR, shopify.* Taxonomie, mm-google-shopping.*, zalando_*,
+// MASTER/PIM, tote Dubletten) wird von anderen Apps gepflegt und NIE angefasst.
+// ============================================================================
+const ENGINE_ALLOWED: ReadonlySet<string> = new Set([
+  // Specs (global.*) — fill-empty, Ausnahme Schutzklasse = asx gewinnt
+  "global.Obermaterial", "global.Innenfutter", "global.Laufsohle",
+  "global.Materialzusammensetzung", "global.Schutzklasse", "global.Farbe",
+  "global.Geschlecht", "global.Schuhform", "global.Schuhhoehe",
+  // Normen + technische custom-Specs
+  "custom.normen", "custom.din_norm", "custom.schutzkappe", "custom.weite",
+  "custom.durchtrittschutz", "custom.rutschhemmung", "custom.materialgewicht",
+  "custom.pflegehinweise", "custom.warnschutz",
+  // Präsentation (regenerierbar)
+  "custom.kurz_usp", "custom.bulletpoints_rich",
+]);
+
+// Sicherheitsfilter: entfernt jedes Metafeld außerhalb des Engine-Scopes.
+function enforceScope(mf: MetafieldTuple[]): { allowed: MetafieldTuple[]; blocked: string[] } {
+  const allowed: MetafieldTuple[] = [];
+  const blocked: string[] = [];
+  for (const t of mf) {
+    const key = `${t[0]}.${t[1]}`;
+    if (ENGINE_ALLOWED.has(key)) allowed.push(t);
+    else blocked.push(key);
+  }
+  return { allowed, blocked };
+}
 
 // EAN-Gate: scrape Kandidaten, finde den, dessen displayed_ean in unseren Barcodes liegt.
 async function eanGate(
@@ -74,6 +105,8 @@ export async function processProduct(
   const rutsch = canonRutsch(specs.rutschhemmung, norms);
   const weite = canonWeiteFromTitle(title);
   const farbe = canonColor(specs.farbe);
+  const geschlecht = canonGeschlecht(title);
+  const warnschutz = deriveWarnschutz(norms);
   const laufsohle = (specs.laufsohle || "").trim() || null;
   const innenfutter = (specs.innenfutter || "").trim() || null;
   const obermaterial = (specs.obermaterial || "").trim() || null;
@@ -94,15 +127,20 @@ export async function processProduct(
   if (!cur("innenfutter") && innenfutter) mf.push(["global", "Innenfutter", "single_line_text_field", innenfutter]);
   if (!cur("laufsohle") && laufsohle) mf.push(["global", "Laufsohle", "single_line_text_field", laufsohle]);
   if (!cur("farbe") && farbe) mf.push(["global", "Farbe", "single_line_text_field", farbe]);
+  if (!cur("geschlecht") && geschlecht) mf.push(["global", "Geschlecht", "single_line_text_field", geschlecht]);
   // custom-Specs nur in Leerfelder
   if (!cur("schutzkappe") && kappe) mf.push(["custom", "schutzkappe", "single_line_text_field", kappe]);
   if (!cur("durchtritt") && durch) mf.push(["custom", "durchtrittschutz", "single_line_text_field", durch]);
   if (!cur("rutsch") && rutsch) mf.push(["custom", "rutschhemmung", "single_line_text_field", rutsch]);
   if (!cur("weite")) mf.push(["custom", "weite", "single_line_text_field", weite]);
-  // Normen (custom.normen list) — fill-empty
+  // Normen: filterbare Liste (custom.normen) + Anzeige-Pendant (custom.din_norm) — fill-empty
   if (!cur("normen") && norms.length) {
     mf.push(["custom", "normen", "list.single_line_text_field", JSON.stringify(norms)]);
   }
+  const dinTxt = dinNormText(norms);
+  if (!cur("dinnorm") && dinTxt) mf.push(["custom", "din_norm", "multi_line_text_field", dinTxt]);
+  // Warnschutz/Hi-Vis (boolean) — nur bei Beleg EN ISO 20471, fill-empty
+  if (!cur("warnschutz") && warnschutz) mf.push(["custom", "warnschutz", "boolean", "true"]);
 
   // unklare Kappe -> Review-Notiz (Feld bleibt leer, Produkt läuft weiter)
   if (!kappe && specs.schutzkappe) {
@@ -119,9 +157,16 @@ export async function processProduct(
   const body = buildBody(brand, modell, klasseAsx, norms, kappe, durch, laufsohle, rutsch, obermaterial, innenfutter, esdFlag, usp);
   const [seoT, seoD] = buildSeo(brand, modell, klasseAsx, kappe, durch, esdFlag, rutsch);
 
-  // 6) Schreiben
-  const res = await writeProduct(pid, mf, body, seoT, seoD, commit);
-  const fieldsWritten = mf.map(([ns, k]) => `${ns}.${k}`);
+  // 6) Scope-Guard: nur Engine-eigene Felder dürfen raus (Abschnitt 17)
+  const { allowed, blocked } = enforceScope(mf);
+  if (blocked.length) {
+    flags.push(`scope-blockiert: ${blocked.join(",")}`);
+    console.log(`  [scope-guard] blockierte Felder bei ${pid}: ${blocked.join(", ")}`);
+  }
+
+  // 7) Schreiben
+  const res = await writeProduct(pid, allowed, body, seoT, seoD, commit);
+  const fieldsWritten = allowed.map(([ns, k]) => `${ns}.${k}`);
   await audit(supabase, {
     product_id: pid, title, result: "GOLD",
     payload: {
@@ -135,6 +180,6 @@ export async function processProduct(
   return {
     status: "gold", asxUrl: url, ean: specs.displayed_ean || null, klasse: klasseAsx, classChange,
     flags, fieldsWritten,
-    preview: { body, bullets, usp, seoTitle: seoT, seoDesc: seoD, metafields: mf },
+    preview: { body, bullets, usp, seoTitle: seoT, seoDesc: seoD, metafields: allowed },
   };
 }

@@ -84,6 +84,27 @@ export function canonColor(raw: string | undefined): string | null {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : null;
 }
 
+// Geschlecht aus UNSEREM Titel (kanonisch: Herren/Damen/Unisex). Nur bei klarem
+// Beleg im Titel; sonst null (fill-empty, nicht raten — Guidelines §5).
+export function canonGeschlecht(title: string): string | null {
+  const t = title.toLowerCase();
+  if (/\b(herren|männer|herren|men)\b/.test(t)) return "Herren";
+  if (/\b(damen|frauen|women)\b/.test(t)) return "Damen";
+  if (/\bunisex\b/.test(t)) return "Unisex";
+  return null;
+}
+
+// custom.din_norm (multi_line) = kanonische Normen als Anzeigetext (Legacy-Pendant
+// zu custom.normen). Keine neue Logik — gleiche Normen, anderes Feld.
+export function dinNormText(norms: string[]): string | null {
+  return norms.length ? norms.join("\n") : null;
+}
+
+// Warnschutz/Hi-Vis: EN ISO 20471 IST die Warnschutz-Norm. true nur bei Beleg.
+export function deriveWarnschutz(norms: string[]): boolean {
+  return norms.some((n) => n.includes("EN ISO 20471"));
+}
+
 // Aus dem Produkttitel Suchbegriffe für asx-Map ableiten (Marke + Modell + Nummer)
 export function deriveSearchTerms(title: string): string {
   let t = title.replace(

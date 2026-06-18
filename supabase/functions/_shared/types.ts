@@ -40,11 +40,14 @@ export interface ShopifyProduct {
   innenfutter?: { value?: string } | null;
   laufsohle?: { value?: string } | null;
   farbe?: { value?: string } | null;
+  geschlecht?: { value?: string } | null;
   normen?: { value?: string } | null;
+  dinnorm?: { value?: string } | null;
   schutzkappe?: { value?: string } | null;
   durchtritt?: { value?: string } | null;
   rutsch?: { value?: string } | null;
   weite?: { value?: string } | null;
+  warnschutz?: { value?: string } | null;
 }
 
 // Ergebnis der Verarbeitung eines Produkts
